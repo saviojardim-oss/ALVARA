@@ -47,7 +47,6 @@
         <table id="tabela-resultados">
             <thead>
                 <tr>
-                    <th>Origem (Tabela)</th>
                     <th>Inscrição</th>
                     <th>Processo</th>
                     <th>Ano</th>
@@ -61,7 +60,7 @@
                 </tr>
             </thead>
             <tbody id="corpo-tabela">
-                <tr><td colspan="11" class="sem-resultados">Digite algo no campo de busca para exibir os resultados.</td></tr>
+                <tr><td colspan="10" class="sem-resultados">Digite algo no campo de busca para exibir os resultados.</td></tr>
             </tbody>
         </table>
     </div>
@@ -72,50 +71,30 @@
 <script>
     let dadosContribuientes = [];
 
-    // Função auxiliar para carregar um arquivo CSV individual e marcar sua origem
-    function carregarCSV(nomeArquivo, identificadorOrigem) {
-        return new Promise((resolve, reject) => {
-            Papa.parse(nomeArquivo, {
-                download: true,
-                header: true,
-                skipEmptyLines: true,
-                delimiter: ";",
-                complete: function(results) {
-                    const dadosComOrigem = results.data.map(item => {
-                        item['_origem_tabela'] = identificadorOrigem;
-                        return item;
-                    });
-                    resolve(dadosComOrigem);
-                },
-                error: function(err) {
-                    console.error("Erro ao ler " + nomeArquivo, err);
-                    resolve([]);
-                }
-            });
-        });
-    }
+    // Lendo apenas o arquivo 'dados.csv'
+    Papa.parse('dados.csv', {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        delimiter: ";", 
+        complete: function(results) {
+            dadosContribuientes = results.data;
 
-    // Carrega os arquivos dados1.csv, dados2.csv e dados3.csv em paralelo
-    Promise.all([
-        carregarCSV('dados1.csv', 'Dados 1'),
-        carregarCSV('dados2.csv', 'Dados 2'),
-        carregarCSV('dados3.csv', 'Dados 3')
-    ]).then(resultados => {
-        dadosContribuientes = [].concat(...resultados);
-
-        if (dadosContribuientes.length === 0) {
-            document.getElementById('status-mensagem').innerText = "Nenhum dado foi encontrado. Verifique os arquivos dados1.csv, dados2.csv e dados3.csv.";
+            if (dadosContribuientes.length === 0) {
+                document.getElementById('status-mensagem').innerText = "Nenhum dado foi encontrado. Certifique-se de que o arquivo se chama exatamente 'dados.csv'.";
+                document.getElementById('status-mensagem').style.color = 'red';
+                return;
+            }
+            
+            // Ativa a caixa de busca e oculta a mensagem de carregamento inicial
+            document.getElementById('busca-geral').disabled = false;
+            document.getElementById('status-mensagem').style.display = 'none';
+        },
+        error: function(err) {
+            console.error("Erro ao ler o CSV:", err);
+            document.getElementById('status-mensagem').innerText = "Erro ao carregar o arquivo CSV. Certifique-se de que o arquivo se chama exatamente 'dados.csv' na mesma pasta.";
             document.getElementById('status-mensagem').style.color = 'red';
-            return;
         }
-        
-        // Ativa a caixa de busca e oculta o aviso de carregamento inicial
-        document.getElementById('busca-geral').disabled = false;
-        document.getElementById('status-mensagem').style.display = 'none';
-    }).catch(err => {
-        console.error("Erro geral na unificação das tabelas:", err);
-        document.getElementById('status-mensagem').innerText = "Erro crítico ao processar tabelas.";
-        document.getElementById('status-mensagem').style.color = 'red';
     });
 
     // Renderizar linhas na tabela
@@ -126,14 +105,14 @@
         
         if (!buscaAtiva) {
             contador.innerText = "Aguardando termo de busca...";
-            corpoTabela.innerHTML = `<tr><td colspan="11" class="sem-resultados">Digite algo no campo de busca para exibir os resultados.</td></tr>`;
+            corpoTabela.innerHTML = `<tr><td colspan="10" class="sem-resultados">Digite algo no campo de busca para exibir os resultados.</td></tr>`;
             return;
         }
 
         contador.innerText = `${lista.length} registro(s) encontrado(s).`;
 
         if (lista.length === 0) {
-            corpoTabela.innerHTML = `<tr><td colspan="11" class="sem-resultados">Nenhum registro correspondente à busca.</td></tr>`;
+            corpoTabela.innerHTML = `<tr><td colspan="10" class="sem-resultados">Nenhum registro correspondente à busca.</td></tr>`;
             return;
         }
 
@@ -142,7 +121,6 @@
             const pegarValor = (campo) => item[campo.toLowerCase().trim()] || item[campo.toUpperCase().trim()] || '-';
 
             tr.innerHTML = `
-                <td><span style="background: #e2e8f0; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">${item['_origem_tabela']}</span></td>
                 <td><b>${pegarValor('inscricao')}</b></td>
                 <td>${pegarValor('processo')}</td>
                 <td>${pegarValor('ano')}</td>
@@ -151,36 +129,4 @@
                 <td>${pegarValor('endereco')}</td>
                 <td>${pegarValor('area residencial')}</td>
                 <td>${pegarValor('area comercial')}</td>
-                <td>${pegarValor('situacao')}</td>
-                <td>${pegarValor('paralisado')}</td>
-            `;
-            corpoTabela.appendChild(tr);
-        });
-    }
-
-    // Filtro global em tempo real (Garante a busca por Nome e qualquer outra coluna)
-    function executarBuscaGeral() {
-        const termoBusca = document.getElementById('busca-geral').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-        if (!termoBusca.trim()) {
-            exibirDados([], false);
-            return;
-        }
-
-        const filtrados = dadosContribuientes.filter(item => {
-            return Object.keys(item).some(chave => {
-                if (chave === '_origem_tabela') return false;
-                const valorCampo = String(item[chave] || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                return valorCampo.includes(termoBusca);
-            });
-        });
-
-        exibirDados(filtrados, true);
-    }
-
-    // Escuta a digitação no input único
-    document.getElementById('busca-geral').addEventListener('input', executarBuscaGeral);
-</script>
-
-</body>
-</html>
+                <td>${pegar
