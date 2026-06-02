@@ -3,130 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consulta de Processos e Inscrições</title>
+    <title>Consulta de Processos e Alvaras</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #f8f9fa; margin: 0; padding: 20px 15px; color: #333; }
         .container { max-width: 100%; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        h1 { color: #1e3a8a; margin-top: 0; font-size: 24px; text-align: center; margin-bottom: 25px; }
+        h1 { color: #1e3a8a; margin-top: 0; font-size: 24px; text-align: center; margin-bottom: 20px; }
         
-        /* Painel de Busca Unificada */
-        .busca-container { max-width: 500px; margin: 0 auto 20px auto; display: flex; flex-direction: column; }
-        .busca-container label { font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 6px; text-align: center; }
-        .busca-input { padding: 12px 16px; font-size: 16px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; transition: all 0.2s; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-        .busca-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
-        
-        .contador { text-align: center; color: #64748b; font-size: 14px; margin-bottom: 15px; font-weight: 500; }
-
-        /* Tabela Estruturada com Rolagem Horizontal */
-        .table-responsive { overflow-x: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; max-height: 600px; }
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
-        th { background-color: #1e3a8a; color: white; padding: 12px 10px; font-weight: 600; position: sticky; top: 0; z-index: 10; white-space: nowrap; }
-        td { padding: 10px; border-bottom: 1px solid #e2e8f0; color: #475569; white-space: nowrap; }
-        tr:nth-child(even) { background-color: #f8fafc; }
-        tr:hover { background-color: #f1f5f9; }
-
-        .sem-resultados { text-align: center; padding: 40px; color: #94a3b8; font-style: italic; }
-        .carregando { text-align: center; padding: 20px; color: #3b82f6; font-weight: bold; }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <h1>📋 Painel de Consulta de Processos</h1>
-    
-    <div class="busca-container">
-        <label for="busca-geral">Busca</label>
-        <input type="text" id="busca-geral" class="busca-input" placeholder="Digite nome, inscrição, processo, CPF..." disabled>
-    </div>
-    
-    <div id="contador-resultados" class="contador">Aguardando termo de busca...</div>
-
-    <div class="table-responsive">
-        <table id="tabela-resultados">
-            <thead>
-                <tr>
-                    <th>Inscrição</th>
-                    <th>Processo</th>
-                    <th>Ano</th>
-                    <th>Nome</th>
-                    <th>CPF</th>
-                    <th>Endereço</th>
-                    <th>Área Residencial</th>
-                    <th>Área Comercial</th>
-                    <th>Situação</th>
-                    <th>Paralisado</th>
-                </tr>
-            </thead>
-            <tbody id="corpo-tabela">
-                <tr><td colspan="10" class="sem-resultados">Digite algo no campo de busca para exibir os resultados.</td></tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div id="status-mensagem" class="carregando">Carregando base de dados...</div>
-</div>
-
-<script>
-    let dadosContribuientes = [];
-
-    // Lendo apenas o arquivo 'dados.csv'
-    Papa.parse('dados.csv', {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        delimiter: ";", 
-        complete: function(results) {
-            dadosContribuientes = results.data;
-
-            if (dadosContribuientes.length === 0) {
-                document.getElementById('status-mensagem').innerText = "Nenhum dado foi encontrado. Certifique-se de que o arquivo se chama exatamente 'dados.csv'.";
-                document.getElementById('status-mensagem').style.color = 'red';
-                return;
-            }
-            
-            // Ativa a caixa de busca e oculta a mensagem de carregamento inicial
-            document.getElementById('busca-geral').disabled = false;
-            document.getElementById('status-mensagem').style.display = 'none';
-        },
-        error: function(err) {
-            console.error("Erro ao ler o CSV:", err);
-            document.getElementById('status-mensagem').innerText = "Erro ao carregar o arquivo CSV. Certifique-se de que o arquivo se chama exatamente 'dados.csv' na mesma pasta.";
-            document.getElementById('status-mensagem').style.color = 'red';
-        }
-    });
-
-    // Renderizar linhas na tabela
-    function exibirDados(lista, buscaAtiva) {
-        const corpoTabela = document.getElementById('corpo-tabela');
-        const contador = document.getElementById('contador-resultados');
-        corpoTabela.innerHTML = "";
-        
-        if (!buscaAtiva) {
-            contador.innerText = "Aguardando termo de busca...";
-            corpoTabela.innerHTML = `<tr><td colspan="10" class="sem-resultados">Digite algo no campo de busca para exibir os resultados.</td></tr>`;
-            return;
-        }
-
-        contador.innerText = `${lista.length} registro(s) encontrado(s).`;
-
-        if (lista.length === 0) {
-            corpoTabela.innerHTML = `<tr><td colspan="10" class="sem-resultados">Nenhum registro correspondente à busca.</td></tr>`;
-            return;
-        }
-
-        lista.forEach(item => {
-            const tr = document.createElement('tr');
-            const pegarValor = (campo) => item[campo.toLowerCase().trim()] || item[campo.toUpperCase().trim()] || '-';
-
-            tr.innerHTML = `
-                <td><b>${pegarValor('inscricao')}</b></td>
-                <td>${pegarValor('processo')}</td>
-                <td>${pegarValor('ano')}</td>
-                <td><b>${pegarValor('nome')}</b></td>
-                <td>${pegarValor('cpf')}</td>
-                <td>${pegarValor('endereco')}</td>
-                <td>${pegarValor('area residencial')}</td>
-                <td>${pegarValor('area comercial')}</td>
-                <td>${pegar
+        /* Painel de Filtros Avançados Inteligentes */
+        .filtros-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; background: #f1f5f9; padding: 15px; border-radius: 8px; }
+        .grupo-filtro { display: flex; flex-direction: column; }
+        .grupo-filtro label { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+        .filtro-input { padding:
