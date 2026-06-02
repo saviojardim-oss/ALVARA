@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta de Processos e Inscrições</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f8f9fa; margin: 0; padding: 20px 15px; color: #333; }
+        .container { max-width: 100%; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h1 { color: #1e3a8a; margin-top: 0; font-size: 24px; text-align: center; margin-bottom: 25px; }
+        
+        /* Painel de Busca Unificada */
+        .busca-container { max-width: 500px; margin: 0 auto 20px auto; display: flex; flex-direction: column; }
+        .busca-container label { font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 6px; text-align: center; }
+        .busca-input { padding: 12px 16px; font-size: 16px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; transition: all 0.2s; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .busca-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+        
+        .contador { text-align: center; color: #64748b; font-size: 14px; margin-bottom: 15px; font-weight: 500; }
+
+        /* Tabela Estruturada com Rolagem Horizontal */
+        .table-responsive { overflow-x: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; max-height: 600px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+        th { background-color: #1e3a8a; color: white; padding: 12px 10px; font-weight: 600; position: sticky; top: 0; z-index: 10; white-space: nowrap; }
+        td { padding: 10px; border-bottom: 1px solid #e2e8f0; color: #475569; white-space: nowrap; }
+        tr:nth-child(even) { background-color: #f8fafc; }
+        tr:hover { background-color: #f1f5f9; }
+
+        .sem-resultados { text-align: center; padding: 40px; color: #94a3b8; font-style: italic; }
+        .carregando { text-align: center; padding: 20px; color: #3b82f6; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📋 Painel de Consulta de Processos</h1>
+    
+    <div class="busca-container">
+        <label for="busca-geral">Busca</label>
+        <input type="text" id="busca-geral" class="busca-input" placeholder="Digite nome, inscrição, processo, CPF..." disabled>
+    </div>
+    
+    <div id="contador-resultados" class="contador">Aguardando termo de busca...</div>
+
+    <div class="table-responsive">
+        <table id="tabela-resultados">
+            <thead>
+                <tr>
+                    <th>Origem (Tabela)</th>
+                    <th>Inscrição</th>
+                    <th>Processo</th>
+                    <th>Ano</th>
+                    <th>Nome</th>
+                    <th>CPF</th>
+                    <th>Endereço</th>
+                    <th>Área Residencial</th>
+                    <th>Área Comercial</th>
+                    <th>Situação</th>
+                    <th>Paralisado</th>
+                </tr>
+            </thead>
+            <tbody id="corpo-tabela">
+                <tr><td colspan="11" class="sem-resultados">Digite algo no campo de busca para exibir os resultados.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="status-mensagem" class="carregando">Carregando base de dados...</div>
+</div>
+
+<script>
+    let dadosContribuientes = [];
+
+    // Função auxiliar para carregar um arquivo CSV individual e marcar sua origem
+    function carregarCSV(nomeArquivo, identificadorOrigem) {
+        return new Promise((resolve, reject) => {
+            Papa.parse(nomeArquivo, {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                delimiter: ";",
+                complete: function(results) {
+                    const dadosComOrigem = results.data.map(item => {
+                        item['_origem_tabela'] = identificadorOrigem;
+                        return item;
+                    });
+                    resolve(dadosComOrigem);
+                },
+                error: function(err) {
+                    console.error("Erro ao ler " + nomeArquivo, err);
+                    resolve([]);
+                }
+            });
+        });
+    }
+
+    // Carrega os arquivos dados1.csv, dados2.csv e dados3.csv em paralelo
+    Promise.all([
+        carregarCSV('dados1.csv', 'Dados 1'),
+        carregarCSV('dados2.csv', 'Dados 2'),
+        carregarCSV('dados3.csv', 'Dados 3')
+    ]).then(resultados => {
+        dadosContribuientes = [].concat(...resultados);
+
+        if (dadosContribuientes.length === 0) {
+            document.getElementById('status-mensagem').innerText = "Nenhum dado foi encontrado. Verifique os arquivos dados1.csv, dados2.csv e dados3.csv.";
+            document.getElementById('status-mensagem').style.color = 'red';
+            return;
+        }
+        
+        // Ativa a caixa de busca e oculta o aviso de carregamento inicial
+        document.getElementById('busca-geral').disabled = false;
+        document.getElementById('status-mensagem').style.display = 'none';
+    }).catch(err => {
+        console.error("Erro geral na unificação das tabelas:", err);
+        document.getElementById('status-mensagem').innerText = "Erro crítico ao processar tabelas.";
+        document.getElementById('status-mensagem').style.color = 'red';
+    });
+
+    // Renderizar linhas na tabela
+    function exibirDados(lista, buscaAtiva) {
+        const corpoTabela = document.getElementById('corpo-tabela');
+        const contador = document.getElementById('contador-resultados');
+        corpoTabela.innerHTML = "";
+        
+        if (!buscaAtiva) {
+            contador.innerText = "Aguardando termo de busca...";
+            corpoTabela.innerHTML = `<tr><td colspan="11" class="sem-resultados">Digite algo no campo de busca para exibir os resultados.</td></tr>`;
+            return;
+        }
+
+        contador.innerText = `${lista.length} registro(s) encontrado(s).`;
+
+        if (lista.length === 0) {
+            corpoTabela.innerHTML = `<tr><td colspan="11" class="sem-resultados">Nenhum registro correspondente à busca.</td></tr>`;
+            return;
+        }
+
+        lista.forEach(item => {
+            const tr = document.createElement('tr');
+            const pegarValor = (campo) => item[campo.toLowerCase().trim()] || item[campo.toUpperCase().trim()] || '-';
+
+            tr.innerHTML = `
+                <td><span style="background: #e2e8f0; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">${item['_origem_tabela']}</span></td>
+                <td><b>${pegarValor('inscricao')}</b></td>
+                <td>${pegarValor('processo')}</td>
+                <td>${pegarValor('ano')}</td>
+                <td><b>${pegarValor('nome')}</b></td>
+                <td>${pegarValor('cpf')}</td>
+                <td>${pegarValor('endereco')}</td>
+                <td>${pegarValor('area residencial')}</td>
+                <td>${pegarValor('area comercial')}</td>
+                <td>${pegarValor('situacao')}</td>
+                <td>${pegarValor('paralisado')}</td>
+            `;
+            corpoTabela.appendChild(tr);
+        });
+    }
+
+    // Filtro global em tempo real (Garante a busca por Nome e qualquer outra coluna)
+    function executarBuscaGeral() {
+        const termoBusca = document.getElementById('busca-geral').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+        if (!termoBusca.trim()) {
+            exibirDados([], false);
+            return;
+        }
+
+        const filtrados = dadosContribuientes.filter(item => {
+            return Object.keys(item).some(chave => {
+                if (chave === '_origem_tabela') return false;
+                const valorCampo = String(item[chave] || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return valorCampo.includes(termoBusca);
+            });
+        });
+
+        exibirDados(filtrados, true);
+    }
+
+    // Escuta a digitação no input único
+    document.getElementById('busca-geral').addEventListener('input', executarBuscaGeral);
+</script>
+
+</body>
+</html>
